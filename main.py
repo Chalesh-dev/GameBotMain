@@ -477,13 +477,17 @@ async def tp_claim_callback(*args, **kwargs: Unpack[TopicEmitter]):
     # todo: db update or game instance update and balance update
     if type_of_claim == "league":
         user_data["league_task"]["claimed_tasks"].append(id_claim)
-        unclaimed = list(range(0, len(LEAGUES)))
-        for x in user_data["league_task"]["claimed_tasks"]:
-            unclaimed.remove(x)
+        unclaimed = [LEAGUES.index(x) for x in
+                     user_data["league_task"]["tasks"][:LEAGUES.index(user_data['in_game']['league'])]]
+        # for x in user_data["league_task"]["claimed_tasks"]:
+        #     print(LEAGUES.index(x))
+        #     print(unclaimed)
+        #
+        #     unclaimed.remove(LEAGUES.index(x))
         await send_wss_msg(ws, Topics.CLAIM_LEAGUE, ClaimLeagueOutboundResponse(
             leagues=TasksLeagueOutboundData(
                 unclaimed=unclaimed,
-                claimed=[LEAGUES.index(x) for x in user_data["league_task"]["claimed_tasks"]],
+                claimed=user_data["league_task"]["claimed_tasks"],
                 current=LEAGUES.index(user_data["in_game"]["league"]),
                 total_amount=user_data['user']['amount'] + LEAGUES[id_claim]["reward"],
             ),
@@ -491,40 +495,41 @@ async def tp_claim_callback(*args, **kwargs: Unpack[TopicEmitter]):
             balance_up=LEAGUES[id_claim]["reward"]
         ))
     else:  # todo whole section is wrong!!!!!
-        await send_wss_msg(ws, Topics.CLAIM_REFERRAL if type_of_claim =="referral" else Topics.CLAIM_TASK , TasksOutboundData(
-            balance_up=100231083,  # todo
-            balance=2986489156,  # todo
-            special_tasks=[
-                TasksSpecialOutboundData(
-                    title="Join and Unlock The Impossible",
-                    uuid=uuid.uuid4().__str__(),
-                    link="https://google.com",
-                    reward=100_000,
-                    status=False,
-                    claimed=True,
-                ),
-                TasksSpecialOutboundData(
-                    title="Fap instead of Tap",
-                    uuid=uuid.uuid4().__str__(),
-                    link="https://xvideos.com",
-                    reward=696969,
-                    status=True,
-                    claimed=True
-                )
-            ],
-            leagues=TasksLeagueOutboundData(
-                unclaimed=[0, 1],
-                claimed=[3, 2],
-                current=4,
-                total_amount=500000
-            ),
-            referral=TasksReferralOutboundData(
-                unclaimed=[0, 1, 4],
-                claimed=[2, 3],
-                current=5,
-                total_referral=30,
-            ),
-        ),
+        await send_wss_msg(ws, Topics.CLAIM_REFERRAL if type_of_claim == "referral" else Topics.CLAIM_TASK,
+                           TasksOutboundData(
+                               balance_up=100231083,  # todo
+                               balance=2986489156,  # todo
+                               special_tasks=[
+                                   TasksSpecialOutboundData(
+                                       title="Join and Unlock The Impossible",
+                                       uuid=uuid.uuid4().__str__(),
+                                       link="https://google.com",
+                                       reward=100_000,
+                                       status=False,
+                                       claimed=True,
+                                   ),
+                                   TasksSpecialOutboundData(
+                                       title="Fap instead of Tap",
+                                       uuid=uuid.uuid4().__str__(),
+                                       link="https://xvideos.com",
+                                       reward=696969,
+                                       status=True,
+                                       claimed=True
+                                   )
+                               ],
+                               leagues=TasksLeagueOutboundData(
+                                   unclaimed=[0, 1],
+                                   claimed=[3, 2],
+                                   current=4,
+                                   total_amount=500000
+                               ),
+                               referral=TasksReferralOutboundData(
+                                   unclaimed=[0, 1, 4],
+                                   claimed=[2, 3],
+                                   current=5,
+                                   total_referral=30,
+                               ),
+                           ),
                            status=True
                            )
 
