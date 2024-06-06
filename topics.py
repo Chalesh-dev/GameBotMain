@@ -1,4 +1,19 @@
 from typing import TypedDict, Literal
+from enum import Enum
+
+
+class Topics(Enum):
+    ACTIVATE = "activate"
+    ENERGY = 'energy'
+    BALANCE = "balance"
+    BOT_EARNING = "bot earning"
+    STATS = "stats"
+    SPECIAL_BOOST = "special boost"
+    BOOST = "boost"
+    TASKS = "tasks"
+    REFERRAL = "referral"
+    TASKS_STATUS = "task status"
+    CLAIM_TASK = "claim task"
 
 
 class EnergyOutboundData(TypedDict):
@@ -80,6 +95,7 @@ class RefData(TypedDict):
     name: str
     league: int
     total_amount: int
+    referrer_link:str
 
 
 class ReferralOutboundData(TypedDict):
@@ -88,12 +104,13 @@ class ReferralOutboundData(TypedDict):
     ref_num: int
 
 
+
 class UpgradeOutboundData(TypedDict):
     upgraded_unit: Literal["multi_tap", "tap_bot", "limit", "speed"]
     new_level: int
     is_max: bool
     next_level_price: int
-    balance:int
+    balance: int
 
 
 class ActivateOutboundResponse(TypedDict):
@@ -133,7 +150,11 @@ class ClaimReferralOutboundResponse(TypedDict):
 
 
 class OutboundData(TypedDict):
-    topic: Literal["activate","energy", "balance", "bot earning", "stats", "special boost", "boost", "tasks", "referral"]
+    topic: Topics
     result: object
     status: bool
 
+
+class TaskStatus(TypedDict):
+    claim: list[str]  # uuid to return
+    check: list[str]  # uuid to return
