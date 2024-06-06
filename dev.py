@@ -162,7 +162,7 @@ async def handler(websocket: WebSocketServerProtocol):
                         unclaimed=[0,1,2],
                         claimed=[3],
                         current=4,
-                        total_amount=500000
+                        total_amount=22000
                     ),
                     referral=TasksReferralOutboundData(
                         unclaimed=[0, 1, 4],
