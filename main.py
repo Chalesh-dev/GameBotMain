@@ -491,7 +491,7 @@ async def tp_claim_callback(*args, **kwargs: Unpack[TopicEmitter]):
             balance_up=LEAGUES[id_claim]["reward"]
         ))
     else:  # todo whole section is wrong!!!!!
-        await send_wss_msg(ws, Topics.TASKS, TasksOutboundData(
+        await send_wss_msg(ws, Topics.CLAIM_REFERRAL if type_of_claim =="referral" else Topics.CLAIM_TASK , TasksOutboundData(
             balance_up=100231083,  # todo
             balance=2986489156,  # todo
             special_tasks=[

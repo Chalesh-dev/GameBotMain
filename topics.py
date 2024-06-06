@@ -17,6 +17,7 @@ class Topics(Enum):
     UPGRADE = "upgrade"
     TAP = "tap"
     CLAIM_LEAGUE = "claim league"
+    CLAIM_REFERRAL = "claim referral"
 
 
 class EnergyOutboundData(TypedDict):
