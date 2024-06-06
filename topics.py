@@ -95,14 +95,13 @@ class RefData(TypedDict):
     name: str
     league: int
     total_amount: int
-    referrer_link:str
+    referrer_link: str
 
 
 class ReferralOutboundData(TypedDict):
     invite_link: str
     my_refs: list[RefData]
     ref_num: int
-
 
 
 class UpgradeOutboundData(TypedDict):
@@ -132,12 +131,9 @@ class CheckTaskOutboundResponse(TypedDict):
 
 
 class ClaimLeagueOutboundResponse(TypedDict):
-    unclaimed: list[int]
-    claimed: list[int]
-    current: int
-    total_amount: int
     balance: int
     balance_up: int
+    leagues: TasksLeagueOutboundData
 
 
 class ClaimReferralOutboundResponse(TypedDict):

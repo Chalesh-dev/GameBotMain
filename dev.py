@@ -159,7 +159,7 @@ async def handler(websocket: WebSocketServerProtocol):
                         )
                     ],
                     leagues=TasksLeagueOutboundData(
-                        unclaimed=[0,1,2],
+                        unclaimed=[0, 1, 2],
                         claimed=[3],
                         current=4,
                         total_amount=22000
@@ -176,7 +176,7 @@ async def handler(websocket: WebSocketServerProtocol):
         )
     )
 
-    # todo : on app render
+    # todo : on app render for clicking on claim
     await websocket.send(
         json.dumps(
             OutboundData(
@@ -371,9 +371,9 @@ async def handler(websocket: WebSocketServerProtocol):
                             )
                         ],
                         leagues=TasksLeagueOutboundData(
-                            unclaimed=[0,1,2],
-                            claimed=[],
-                            current=3,
+                            unclaimed=[0, 1],
+                            claimed=[3, 2],
+                            current=4,
                             total_amount=500000
                         ),
                         referral=TasksReferralOutboundData(
@@ -386,6 +386,25 @@ async def handler(websocket: WebSocketServerProtocol):
                     status=True
                 )
             ))
+        elif topic == "claim league":
+            await websocket.send(json.dumps(
+                OutboundData(
+                    topic=topic,
+                    result=ClaimLeagueOutboundResponse(
+                        leagues=TasksLeagueOutboundData(
+                            unclaimed=[0, 1],
+                            claimed=[3, 2],
+                            current=4,
+                            total_amount=22500,
+                        ),
+                        balance=2176214,
+                        balance_up=12321
+                    ),
+                    status=True
+                )
+            )
+            )
+
 
 #
 # ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -396,7 +415,7 @@ async def handler(websocket: WebSocketServerProtocol):
 
 
 async def main():
-    async with serve(host=HOST, port=PORT, ws_handler=handler): # , ssl=ssl_context
+    async with serve(host=HOST, port=PORT, ws_handler=handler):  # , ssl=ssl_context
         print(f"WebSocket is Serving on wss://{HOST}:{PORT}")
         await asyncio.Future()
 

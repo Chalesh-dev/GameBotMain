@@ -1,3 +1,6 @@
+
+from bson import json_util
+
 import pprint
 from typing import TypedDict, Unpack, Required, NotRequired
 import asyncio
@@ -220,26 +223,30 @@ def set_dummy_user_data(user_id: int):
             current=2
         )
     )
-    pprint.pprint(data)
-    users.insert_one(data)
+
+    a = users.insert_one(data)
+    # print(a,"shah")
 
 
 space.drop_collection(users)
-set_dummy_user_data(12)
+# set_dummy_user_data(12)
 
 
 def get_user_data(user_id: int) -> UserData:
-    data: UserData = users.find_one({'user_id': user_id})
-    return data
+    data = users.find_one({'user_id': user_id})
+    print(type(json.loads(json_util.dumps(data))))
+    return json.loads(json_util.dumps(data))
 
 
 def get_data(websocket: WebSocketServerProtocol) -> UserData:
     #todo: handle energy for the offline account
     uid = websocket.path[1:]
     user_data = get_user_data(uid)
+
     if user_data is not None:
         return user_data
     else:
+        # todo: omit dummy data
         set_dummy_user_data(uid)
         user_data = get_user_data(uid)
         return user_data
@@ -263,7 +270,7 @@ class TopicEmitter(TypedDict):
     user_data: Required[UserData]
 
 
-async def topic_balance_emitter(**kwargs: Unpack[TopicEmitter]):
+async def tp_balance_emit(**kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     await send_wss_msg(ws, Topics.BALANCE, BalanceOutboundData(balance=user_data['balance']['balance'],
@@ -271,32 +278,33 @@ async def topic_balance_emitter(**kwargs: Unpack[TopicEmitter]):
                                                                league=3), True)
 
 
-async def topic_energy_emitter(**kwargs: Unpack[TopicEmitter]):
+async def tp_energy_emit(**kwargs: Unpack[TopicEmitter]):
     # todo: handle offline energy calculation
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
-    await send_wss_msg(ws, Topics.ENERGY, EnergyOutboundData(energy=user_data.in_game.energy,
-                                                             max_energy=user_data.boost.limit * 500,
-                                                             energy_speed=user_data.boost.energy), True)
+    # pprint.pprint(user_data)
+    await send_wss_msg(ws, Topics.ENERGY, EnergyOutboundData(energy=user_data["in_game"]["energy"],
+                                                             max_energy=user_data['boost']["limit"] * 1000,
+                                                             energy_speed=user_data['boost']["speed"]), True)
 
 
-async def topic_bot_earning_emitter(**kwargs: Unpack[TopicEmitter]):
+async def tp_bot_earning_emit(**kwargs: Unpack[TopicEmitter]):
     # todo: handle offline energy calculation and bot earning this is dummy data here
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     await send_wss_msg(ws, Topics.BOT_EARNING, BotEarningOutboundData(earning=1000), True)
 
 
-async def topic_special_boost_emitter(**kwargs: Unpack[TopicEmitter]):
+async def tp_special_boost_emit(**kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     await send_wss_msg(ws, Topics.SPECIAL_BOOST,
-                       SpecialBoosterOutboundData(max_special_boost=3, guru_left=user_data.special_boost.guru.left,
+                       SpecialBoosterOutboundData(max_special_boost=3, guru_left=user_data["special_boost"]["guru"]["left"],
                                                   next_update=int((time.time() / 86400) + 1) * 86400,
-                                                  full_tank_left=user_data.special_boost.refill.left), True)
+                                                  full_tank_left=user_data["special_boost"]["refill"]["left"]), True)
 
 
-async def topic_stats_emitter(**kwargs: Unpack[TopicEmitter]):
+async def tp_stats_emit(**kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     await send_wss_msg(ws, Topics.STATS,
@@ -305,6 +313,13 @@ async def topic_stats_emitter(**kwargs: Unpack[TopicEmitter]):
                                          total_players=2846128,
                                          online_players=2131247,
                                          daily_players=21421432), True)
+
+
+async def tp_task_stat_emit(**kwargs: Unpack[TopicEmitter]):
+    ws = kwargs["ws"]
+    user_data = kwargs["user_data"]
+    # todo: bot integration with this empty arrays - it is not in database!!!!! make its integration on mongodb
+    await send_wss_msg(ws, Topics.TASKS_STATUS,TaskStatus(check=[],claim=[]), True)
 
 
 async def topic_boost_emitter(**kwargs: Unpack[TopicEmitter]):
@@ -335,47 +350,59 @@ async def topic_boost_emitter(**kwargs: Unpack[TopicEmitter]):
                        ), True)
 
 
-async def topic_tasks_emitter(**kwargs: Unpack[TopicEmitter]):
+async def tp_tasks_emit(**kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     await send_wss_msg(ws, Topics.TASKS, TasksOutboundData(
         special_tasks=[TasksSpecialOutboundData(
-            title=x.title,
-            uuid=x.uuid,
-            link=x.link,
-            reward=x.reward,
+            title=x["title"],
+            uuid=x["uuid"],
+            link=x["link"],
+            reward=x["reward"],
             status=True,
-            claimed=TASKS.index(x) in user_data.special_task.claimed_tasks
+            claimed=TASKS.index(x) in user_data["special_task"]["claimed_tasks"]
         ) for x in TASKS],
         leagues=TasksLeagueOutboundData(
-            unclaimed=[x for x in user_data.league_task.tasks[:user_data.in_game.league]],
-            claimed=user_data.league_task.claimed_tasks,
-            current=user_data.in_game.league,
-            total_amount=user_data.user.amount
+            unclaimed=[x for x in user_data["league_task"]["tasks"][:LEAGUES.index(user_data['in_game']['league'])]],
+            claimed=user_data["league_task"]["claimed_tasks"],
+            current=user_data["in_game"]["league"],
+            total_amount=user_data["user"]["amount"]
         ),
         referral=TasksReferralOutboundData(
-            unclaimed=[x for x in user_data.ref_task.tasks],
-            claimed=user_data.ref_task.claimed_tasks,
-            current=user_data.referral.current,
-            total_referral=len(user_data.referral.ref_to),
+            unclaimed=[x for x in user_data["ref_task"]["tasks"]],
+            claimed=user_data["ref_task"]["claimed_tasks"],
+            current=user_data["referral"]["current"],
+            total_referral=len(user_data["referral"]["ref_to"]),
         ),
     ), True)
 
 
-async def
+# async def topic_tasks_status_callback(**kwargs: Unpack[TopicEmitter]):
+#     ws = kwargs["ws"]
+#     user_data = kwargs["user_data"]
+#     await send_wss_msg(ws, Topics.TASKS, TaskStatus())
 
 async def handler(ws: WebSocketServerProtocol):
     user_data = get_data(ws)
+    pprint.pprint(user_data)
     if not user_data:
         logging.warning("user is not registered in the bot")
-    else:
-        logging.info(f"user Connected! Telegram Id: {user_data["user_id"]} Client IP: {ws.remote_address[0]}")
-        await topic_balance_emitter(ws=ws, user_data=user_data)
-        await topic_energy_emitter(ws=ws, user_data=user_data)
-        await topic_bot_earning_emitter(ws=ws, user_data=user_data)
-        await topic_special_boost_emitter(ws=ws, user_data=user_data)
-        await topic_stats_emitter(ws=ws, user_data=user_data)
-        await topic_tasks_emitter(ws=ws, user_data=user_data)
+        return
+
+    logging.info(f"user Connected! Telegram Id: {user_data["user_id"]} Client IP: {ws.remote_address[0]}")
+    await tp_balance_emit(ws=ws, user_data=user_data)
+    await tp_energy_emit(ws=ws, user_data=user_data)
+    await tp_bot_earning_emit(ws=ws, user_data=user_data)
+    await tp_special_boost_emit(ws=ws, user_data=user_data)
+    await tp_stats_emit(ws=ws, user_data=user_data)
+    await tp_tasks_emit(ws=ws, user_data=user_data)
+    await tp_task_stat_emit(ws=ws, user_data=user_data)
+    async for message in ws:
+        data = json.loads(message)
+        request = data["request"]
+        topic = data["topic"]
+        if topic == "activate" and request == "guru":
+
 
 
 async def main():
