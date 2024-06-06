@@ -345,11 +345,11 @@ async def tp_referral_emit(**kwargs: Unpack[TopicEmitter]):
         #todo: !!!
         # my_refs=user_data['referral']["ref_to"],
         my_refs=[RefData(
-                            league=2,
-                            name="Mahmud Ahmadi Nijad",
-                            total_amount=45_500,
-                            referrer_link="https://t.me/ahmadinejad"
-                        )],
+            league=2,
+            name="Mahmud Ahmadi Nijad",
+            total_amount=45_500,
+            referrer_link="https://t.me/ahmadinejad"
+        )],
         ref_num=len(user_data['referral']["ref_to"])
     ), True)
 
@@ -396,7 +396,8 @@ async def tp_tasks_emit(**kwargs: Unpack[TopicEmitter]):
             claimed=TASKS.index(x) in user_data["special_task"]["claimed_tasks"]
         ) for x in TASKS],
         leagues=TasksLeagueOutboundData(
-            unclaimed=[LEAGUES.index(x) for x in user_data["league_task"]["tasks"][:LEAGUES.index(user_data['in_game']['league'])]],
+            unclaimed=[LEAGUES.index(x) for x in
+                       user_data["league_task"]["tasks"][:LEAGUES.index(user_data['in_game']['league'])]],
             claimed=user_data["league_task"]["claimed_tasks"],
             current=LEAGUES.index(user_data["in_game"]["league"]),
             total_amount=user_data["user"]["amount"]
@@ -489,10 +490,10 @@ async def tp_claim_callback(*args, **kwargs: Unpack[TopicEmitter]):
             balance=user_data['balance']['balance'] + LEAGUES[id_claim]["reward"],
             balance_up=LEAGUES[id_claim]["reward"]
         ))
-    else: # todo whole section is wrong!!!!!
+    else:  # todo whole section is wrong!!!!!
         await send_wss_msg(ws, Topics.TASKS, TasksOutboundData(
-            balance_up=100231083, # todo
-            balance = 2986489156, # todo
+            balance_up=100231083,  # todo
+            balance=2986489156,  # todo
             special_tasks=[
                 TasksSpecialOutboundData(
                     title="Join and Unlock The Impossible",
@@ -527,6 +528,7 @@ async def tp_claim_callback(*args, **kwargs: Unpack[TopicEmitter]):
                            status=True
                            )
 
+
 async def handler(ws: WebSocketServerProtocol):
     user_data = get_data(ws)
     # pprint.pprint(user_data)
@@ -558,7 +560,7 @@ async def handler(ws: WebSocketServerProtocol):
         elif topic == "tasks status":
             await tp_task_status_callback(request, ws=ws, user_data=user_data)
         elif "claim" in topic:
-            await tp_claim_callback(topic.replace("claim ",""), request, ws=ws, user_data=user_data)
+            await tp_claim_callback(topic.replace("claim ", ""), request, ws=ws, user_data=user_data)
 
 
 async def main():
