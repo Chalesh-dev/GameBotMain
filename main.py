@@ -1,4 +1,3 @@
-
 from bson import json_util
 
 import pprint
@@ -41,6 +40,19 @@ class ReferralLeagueData(TypedDict):
     reward: int
     threshold: int
 
+
+# MULTI_TAP = [200, 500, 2000, 5000, 20_000, 75_000, 200_000, 300_000, 500_000, 750_000, 1_250_000, 2_500_000]
+# SPEED = [200, 500, 2000, 5000, 20_000, 75_000, 200_000, 300_000, 500_000, 750_000, 1_250_000, 2_500_000]
+# LIMIT = [200, 500, 2000, 5000, 20_000, 75_000, 200_000, 300_000, 500_000, 750_000, 1_250_000, 2_500_000]
+# BOT = [200_000]
+
+LEVELS = {
+    "multi_tap": [200, 500, 2000, 5000, 20_000, 75_000, 200_000, 300_000, 500_000, 750_000, 1_250_000, 2_500_000],
+    "limit": [200, 500, 2000, 5000, 20_000, 75_000, 200_000, 300_000, 500_000, 750_000, 1_250_000, 2_500_000],
+    "speed": [1000, 20_000, 50_000, 125_000, 250_000],
+    "bot": [200_000]
+
+}
 
 REFERRALS = [
     ReferralLeagueData(title="invite 1 friends", reward=25_000, threshold=1),
@@ -94,7 +106,7 @@ class BaseUser(TypedDict):
 
 class UserReferralData(TypedDict):
     ref_from: BaseUserRef
-    ref_to: list[BaseUser]
+    ref_to: list[RefData]
     ref_link: str
     current: int
 
@@ -229,6 +241,8 @@ def set_dummy_user_data(user_id: int):
 
 
 space.drop_collection(users)
+
+
 # set_dummy_user_data(12)
 
 
@@ -299,7 +313,8 @@ async def tp_special_boost_emit(**kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     await send_wss_msg(ws, Topics.SPECIAL_BOOST,
-                       SpecialBoosterOutboundData(max_special_boost=3, guru_left=user_data["special_boost"]["guru"]["left"],
+                       SpecialBoosterOutboundData(max_special_boost=3,
+                                                  guru_left=user_data["special_boost"]["guru"]["left"],
                                                   next_update=int((time.time() / 86400) + 1) * 86400,
                                                   full_tank_left=user_data["special_boost"]["refill"]["left"]), True)
 
@@ -319,7 +334,17 @@ async def tp_task_stat_emit(**kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     # todo: bot integration with this empty arrays - it is not in database!!!!! make its integration on mongodb
-    await send_wss_msg(ws, Topics.TASKS_STATUS,TaskStatus(check=[],claim=[]), True)
+    await send_wss_msg(ws, Topics.TASKS_STATUS, TaskStatus(check=[], claim=[]), True)
+
+
+async def tp_referral_emit(**kwargs: Unpack[TopicEmitter]):
+    ws = kwargs["ws"]
+    user_data = kwargs["user_data"]
+    await send_wss_msg(ws, Topics.REFERRAL, ReferralOutboundData(
+        invite_link=f"https://telegram.me/{BOT_USERNAME}?start={user_data['user_id']}",
+        my_refs=user_data['referral']["ref_to"],
+        ref_num=len(user_data['referral']["ref_to"])
+    ), True)
 
 
 async def topic_boost_emitter(**kwargs: Unpack[TopicEmitter]):
@@ -377,10 +402,122 @@ async def tp_tasks_emit(**kwargs: Unpack[TopicEmitter]):
     ), True)
 
 
-# async def topic_tasks_status_callback(**kwargs: Unpack[TopicEmitter]):
+async def tp_activate_callback(*args, **kwargs: Unpack[TopicEmitter]):
+    ws = kwargs["ws"]
+    user_data = kwargs["user_data"]
+    # todo: db update or game instance update
+    await send_wss_msg(ws, Topics.ACTIVATE, ActivateOutboundResponse(
+        unit=args[0],
+        new_left=user_data['special_boost'][args[0]]['left'] - 1,
+        finish_time=user_data['special_boost'][args[0]]['next_update'],
+        energy=user_data["in_game"]["energy"]
+    ))
+
+
+async def tp_upgrade_callback(*args, **kwargs: Unpack[TopicEmitter]):
+    ws = kwargs["ws"]
+    user_data = kwargs["user_data"]
+    # todo: db update or game instance update and balance update
+    new_level = user_data['boost'][args[0]] + 1
+    is_max = len(LEVELS[args[0]]) == new_level
+    await send_wss_msg(ws, Topics.UPGRADE, UpgradeOutboundData(
+        is_max=is_max,
+        new_level=new_level,
+        next_level_price=LEVELS[args[0]][new_level + 1] if not is_max else 0,
+        upgraded_unit=args[0],
+        balance=user_data['balance']["balance"] - LEVELS[args[0]][new_level]
+    ))
+
+
+async def tp_task_status_callback(*args, **kwargs: Unpack[TopicEmitter]):
+    ws = kwargs["ws"]
+    user_data = kwargs["user_data"]
+    # todo: db update or game instance update and balance update
+    await send_wss_msg(ws, Topics.TASKS_STATUS, TaskStatus(
+        check=[],  # todo
+        claim=[]  # todo
+    ))
+
+
+async def tp_tap_callback(*args, **kwargs: Unpack[TopicEmitter]):
+    ws = kwargs["ws"]
+    user_data = kwargs["user_data"]
+    # todo: db update or game instance update and balance update
+    await send_wss_msg(ws, Topics.TAP, TapOutboundResponse(
+        balance=user_data['balance']["balance"] + 1,
+        amount=user_data['user']['amount'] + 1,
+        energy=user_data['ing_game']["energy"]
+    ))
+
+
+async def tp_claim_callback(*args, **kwargs: Unpack[TopicEmitter]):
+    ws = kwargs["ws"]
+    user_data = kwargs["user_data"]
+    type_of_claim = args[0]
+    id_claim: int = args[1]
+    # todo: db update or game instance update and balance update
+    if type_of_claim == "league":
+        user_data["league_task"]["claimed_tasks"].append(id_claim)
+        unclaimed = list(range(0, len(LEAGUES)))
+        for x in user_data["league_task"]["claimed_tasks"]:
+            unclaimed.remove(x)
+        await send_wss_msg(ws, Topics.CLAIM_LEAGUE, ClaimLeagueOutboundResponse(
+            leagues=TasksLeagueOutboundData(
+                unclaimed=unclaimed,
+                claimed=[LEAGUES.index(x) for x in user_data["league_task"]["claimed_tasks"]],
+                current=LEAGUES.index(user_data["in_game"]["league"]),
+                total_amount=user_data['user']['amount'] + LEAGUES[id_claim]["reward"],
+            ),
+            balance=user_data['balance']['balance'] + LEAGUES[id_claim]["reward"],
+            balance_up=LEAGUES[id_claim]["reward"]
+        ))
+    else:
+        await send_wss_msg(ws, Topics.TASKS, TasksOutboundData(
+            special_tasks=[
+                TasksSpecialOutboundData(
+                    title="Join and Unlock The Impossible",
+                    uuid=uuid.uuid4().__str__(),
+                    link="https://google.com",
+                    reward=100_000,
+                    status=False,
+                    claimed=True,
+                ),
+                TasksSpecialOutboundData(
+                    title="Fap instead of Tap",
+                    uuid=uuid.uuid4().__str__(),
+                    link="https://xvideos.com",
+                    reward=696969,
+                    status=True,
+                    claimed=True
+                )
+            ],
+            leagues=TasksLeagueOutboundData(
+                unclaimed=[0, 1],
+                claimed=[3, 2],
+                current=4,
+                total_amount=500000
+            ),
+            referral=TasksReferralOutboundData(
+                unclaimed=[0, 1, 4],
+                claimed=[2, 3],
+                current=5,
+                total_referral=30,
+            ),
+        ),
+                           status=True
+                           )
+
+
+# async def tp_referral_callback(*args, **kwargs: Unpack[TopicEmitter]):
 #     ws = kwargs["ws"]
 #     user_data = kwargs["user_data"]
-#     await send_wss_msg(ws, Topics.TASKS, TaskStatus())
+#     # todo: db update or game instance update and balance update
+#     await send_wss_msg(ws, Topics.TAP, TapOutboundResponse(
+#         balance=user_data['balance']["balance"] + 1,
+#         amount=user_data['user']['amount'] + 1,
+#         energy=user_data['ing_game']["energy"]
+#     ))
+
 
 async def handler(ws: WebSocketServerProtocol):
     user_data = get_data(ws)
@@ -397,12 +534,22 @@ async def handler(ws: WebSocketServerProtocol):
     await tp_stats_emit(ws=ws, user_data=user_data)
     await tp_tasks_emit(ws=ws, user_data=user_data)
     await tp_task_stat_emit(ws=ws, user_data=user_data)
+    await tp_referral_emit(ws=ws, user_data=user_data)
+
     async for message in ws:
         data = json.loads(message)
         request = data["request"]
         topic = data["topic"]
-        if topic == "activate" and request == "guru":
-
+        if topic == "activate":
+            await tp_activate_callback(request, ws=ws, user_data=user_data)
+        elif topic == "upgrade":
+            await tp_upgrade_callback(request, ws=ws, user_data=user_data)
+        elif topic == "tap":
+            await tp_tap_callback(request, ws=ws, user_data=user_data)
+        elif topic == "tasks status":
+            await tp_task_status_callback(request, ws=ws, user_data=user_data)
+        elif "claim" in topic:
+            await tp_claim_callback(topic.replace("claim "), request, ws=ws, user_data=user_data)
 
 
 async def main():

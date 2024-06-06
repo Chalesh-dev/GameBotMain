@@ -342,10 +342,8 @@ async def handler(websocket: WebSocketServerProtocol):
                 )
             )
 
-
-
-        elif topic == "claim task":
-            # request is uuid
+        elif topic == "claim task" or topic == "claim referral":
+            # request is uuid for task and id for ref
             # send balance also !!!!!
             # todo: this a is to set state of global a to reverse
             await websocket.send(json.dumps(
