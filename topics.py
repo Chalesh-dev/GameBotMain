@@ -92,6 +92,8 @@ class TasksOutboundData(TypedDict):
     special_tasks: list[TasksSpecialOutboundData]
     leagues: TasksLeagueOutboundData
     referral: TasksReferralOutboundData
+    balance_up: int
+    balance: int
 
 
 class RefData(TypedDict):

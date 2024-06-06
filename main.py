@@ -208,7 +208,7 @@ def set_dummy_user_data(user_id: int):
             tap_bot=False
         ),
         balance=UserBalance(
-            balance=0,
+            balance=1000000,
             total_click=0,
             rewards=0,
             ref_direct_rewards=0,
@@ -248,7 +248,7 @@ space.drop_collection(users)
 
 def get_user_data(user_id: int) -> UserData:
     data = users.find_one({'user_id': user_id})
-    print(type(json.loads(json_util.dumps(data))))
+    # print(type(json.loads(json_util.dumps(data))))
     return json.loads(json_util.dumps(data))
 
 
@@ -342,33 +342,40 @@ async def tp_referral_emit(**kwargs: Unpack[TopicEmitter]):
     user_data = kwargs["user_data"]
     await send_wss_msg(ws, Topics.REFERRAL, ReferralOutboundData(
         invite_link=f"https://telegram.me/{BOT_USERNAME}?start={user_data['user_id']}",
-        my_refs=user_data['referral']["ref_to"],
+        #todo: !!!
+        # my_refs=user_data['referral']["ref_to"],
+        my_refs=[RefData(
+                            league=2,
+                            name="Mahmud Ahmadi Nijad",
+                            total_amount=45_500,
+                            referrer_link="https://t.me/ahmadinejad"
+                        )],
         ref_num=len(user_data['referral']["ref_to"])
     ), True)
 
 
-async def topic_boost_emitter(**kwargs: Unpack[TopicEmitter]):
+async def tp_boost_emit(**kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     await send_wss_msg(ws, Topics.BOOST,
                        BoosterOutboundData(
                            multi_tap=BoosterDetailOutboundData(
-                               level=user_data.boost.multi_tap,
+                               level=user_data["boost"]["multi_tap"],
                                is_max=False,  # todo!
                                next_level_price=750  # todo !
                            ),
                            energy_limit=BoosterDetailOutboundData(
-                               level=user_data.boost.limit,
+                               level=user_data["boost"]["limit"],
                                is_max=False,  # todo!
                                next_level_price=5000  # todo !
                            ),
                            recharging_speed=BoosterDetailOutboundData(
-                               level=user_data.boost.speed,
+                               level=user_data["boost"]["speed"],
                                is_max=False,  # todo!
                                next_level_price=1500  # todo!
                            ),
                            tap_bot=BoosterDetailOutboundData(
-                               level=user_data.boost.tap_bot,
+                               level=user_data["boost"]["tap_bot"],
                                is_max=False,  # todo!
                                next_level_price=200_000  # todo!
                            )
@@ -378,6 +385,7 @@ async def topic_boost_emitter(**kwargs: Unpack[TopicEmitter]):
 async def tp_tasks_emit(**kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
+    # print(REFERRALS[user_data["referral"]["current"]])
     await send_wss_msg(ws, Topics.TASKS, TasksOutboundData(
         special_tasks=[TasksSpecialOutboundData(
             title=x["title"],
@@ -388,14 +396,14 @@ async def tp_tasks_emit(**kwargs: Unpack[TopicEmitter]):
             claimed=TASKS.index(x) in user_data["special_task"]["claimed_tasks"]
         ) for x in TASKS],
         leagues=TasksLeagueOutboundData(
-            unclaimed=[x for x in user_data["league_task"]["tasks"][:LEAGUES.index(user_data['in_game']['league'])]],
+            unclaimed=[LEAGUES.index(x) for x in user_data["league_task"]["tasks"][:LEAGUES.index(user_data['in_game']['league'])]],
             claimed=user_data["league_task"]["claimed_tasks"],
-            current=user_data["in_game"]["league"],
+            current=LEAGUES.index(user_data["in_game"]["league"]),
             total_amount=user_data["user"]["amount"]
         ),
         referral=TasksReferralOutboundData(
-            unclaimed=[x for x in user_data["ref_task"]["tasks"]],
-            claimed=user_data["ref_task"]["claimed_tasks"],
+            unclaimed=[REFERRALS.index(x) for x in user_data["ref_task"]["tasks"]],
+            claimed=[REFERRALS.index(x) for x in user_data["ref_task"]["claimed_tasks"]],
             current=user_data["referral"]["current"],
             total_referral=len(user_data["referral"]["ref_to"]),
         ),
@@ -418,15 +426,25 @@ async def tp_upgrade_callback(*args, **kwargs: Unpack[TopicEmitter]):
     ws = kwargs["ws"]
     user_data = kwargs["user_data"]
     # todo: db update or game instance update and balance update
-    new_level = user_data['boost'][args[0]] + 1
-    is_max = len(LEVELS[args[0]]) == new_level
-    await send_wss_msg(ws, Topics.UPGRADE, UpgradeOutboundData(
-        is_max=is_max,
-        new_level=new_level,
-        next_level_price=LEVELS[args[0]][new_level + 1] if not is_max else 0,
-        upgraded_unit=args[0],
-        balance=user_data['balance']["balance"] - LEVELS[args[0]][new_level]
-    ))
+    if args[0] != "bot":
+        new_level = user_data['boost'][args[0]]
+        is_max = len(LEVELS[args[0]]) == new_level
+        await send_wss_msg(ws, Topics.UPGRADE, UpgradeOutboundData(
+            is_max=is_max,
+            new_level=new_level,
+            next_level_price=LEVELS[args[0]][new_level] if not is_max else 0,
+            upgraded_unit=args[0],
+            balance=user_data['balance']["balance"] - LEVELS[args[0]][new_level - 1]
+        ))
+    else:
+        is_max = True
+        await send_wss_msg(ws, Topics.UPGRADE, UpgradeOutboundData(
+            is_max=is_max,
+            new_level=1,
+            next_level_price=0,
+            upgraded_unit=args[0],
+            balance=user_data['balance']["balance"] - LEVELS[args[0]][0]
+        ))
 
 
 async def tp_task_status_callback(*args, **kwargs: Unpack[TopicEmitter]):
@@ -446,7 +464,7 @@ async def tp_tap_callback(*args, **kwargs: Unpack[TopicEmitter]):
     await send_wss_msg(ws, Topics.TAP, TapOutboundResponse(
         balance=user_data['balance']["balance"] + 1,
         amount=user_data['user']['amount'] + 1,
-        energy=user_data['ing_game']["energy"]
+        energy=user_data['in_game']["energy"]
     ))
 
 
@@ -471,8 +489,10 @@ async def tp_claim_callback(*args, **kwargs: Unpack[TopicEmitter]):
             balance=user_data['balance']['balance'] + LEAGUES[id_claim]["reward"],
             balance_up=LEAGUES[id_claim]["reward"]
         ))
-    else:
+    else: # todo whole section is wrong!!!!!
         await send_wss_msg(ws, Topics.TASKS, TasksOutboundData(
+            balance_up=100231083, # todo
+            balance = 2986489156, # todo
             special_tasks=[
                 TasksSpecialOutboundData(
                     title="Join and Unlock The Impossible",
@@ -507,27 +527,16 @@ async def tp_claim_callback(*args, **kwargs: Unpack[TopicEmitter]):
                            status=True
                            )
 
-
-# async def tp_referral_callback(*args, **kwargs: Unpack[TopicEmitter]):
-#     ws = kwargs["ws"]
-#     user_data = kwargs["user_data"]
-#     # todo: db update or game instance update and balance update
-#     await send_wss_msg(ws, Topics.TAP, TapOutboundResponse(
-#         balance=user_data['balance']["balance"] + 1,
-#         amount=user_data['user']['amount'] + 1,
-#         energy=user_data['ing_game']["energy"]
-#     ))
-
-
 async def handler(ws: WebSocketServerProtocol):
     user_data = get_data(ws)
-    pprint.pprint(user_data)
+    # pprint.pprint(user_data)
     if not user_data:
         logging.warning("user is not registered in the bot")
         return
 
     logging.info(f"user Connected! Telegram Id: {user_data["user_id"]} Client IP: {ws.remote_address[0]}")
     await tp_balance_emit(ws=ws, user_data=user_data)
+    await tp_boost_emit(ws=ws, user_data=user_data)
     await tp_energy_emit(ws=ws, user_data=user_data)
     await tp_bot_earning_emit(ws=ws, user_data=user_data)
     await tp_special_boost_emit(ws=ws, user_data=user_data)
@@ -549,7 +558,7 @@ async def handler(ws: WebSocketServerProtocol):
         elif topic == "tasks status":
             await tp_task_status_callback(request, ws=ws, user_data=user_data)
         elif "claim" in topic:
-            await tp_claim_callback(topic.replace("claim "), request, ws=ws, user_data=user_data)
+            await tp_claim_callback(topic.replace("claim ",""), request, ws=ws, user_data=user_data)
 
 
 async def main():
