@@ -541,7 +541,7 @@ async def handler(ws: WebSocketServerProtocol):
         logging.warning("user is not registered in the bot")
         return
 
-    logging.info(f"user Connected! Telegram Id: {user_data["user_id"]} Client IP: {ws.remote_address[0]}")
+    logging.info(f"user Connected! Telegram Id: {user_data['user_id']} Client IP: {ws.remote_address[0]}")
     await tp_balance_emit(ws=ws, user_data=user_data)
     await tp_boost_emit(ws=ws, user_data=user_data)
     await tp_energy_emit(ws=ws, user_data=user_data)
