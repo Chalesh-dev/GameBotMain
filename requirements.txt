@@ -1,0 +1,6 @@
+dnspython==2.6.1
+pymongo==4.7.3
+python-dotenv==1.0.1
+typing_extensions==4.12.1
+watchdog==4.0.1
+websockets==12.0
